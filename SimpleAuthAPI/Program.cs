@@ -1,19 +1,19 @@
-﻿using Microsoft.AspNetCore.Authentication.Cookies;
+﻿using System.Security.Claims;
+using Microsoft.AspNetCore.Authentication;
+using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Authentication.Negotiate;
-using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Serilog;
-using System.Security.Claims;
 using SimpleAuthAPI.Data;
 using SimpleAuthAPI.Models;
-using Microsoft.AspNetCore.Authentication;
 
 var builder = WebApplication.CreateBuilder(args);
 
 // ✅ Configure Serilog for logging
 string logDirectory = Path.Combine(AppContext.BaseDirectory, "logs");
-if (!Directory.Exists(logDirectory)) Directory.CreateDirectory(logDirectory);
+if (!Directory.Exists(logDirectory))
+    Directory.CreateDirectory(logDirectory);
 string logFilePath = Path.Combine(logDirectory, "api_log.txt");
 
 Log.Logger = new LoggerConfiguration()
@@ -25,11 +25,12 @@ Log.Logger = new LoggerConfiguration()
 builder.Host.UseSerilog();
 
 // ✅ Setup Authentication (Prioritizing CookieAuth)
-builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationScheme)
+builder
+    .Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationScheme)
     .AddCookie(options =>
     {
         options.Cookie.HttpOnly = true;
-        options.Cookie.SecurePolicy = CookieSecurePolicy.None;  // 🔹 Change to "Always" in production
+        options.Cookie.SecurePolicy = CookieSecurePolicy.None; // 🔹 Change to "Always" in production
         options.Cookie.SameSite = SameSiteMode.Lax;
         options.Cookie.IsEssential = true;
         options.ExpireTimeSpan = TimeSpan.FromDays(7);
@@ -38,7 +39,7 @@ builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationSc
         options.AccessDeniedPath = "/api/Auth/forbidden";
         options.Events.OnRedirectToLogin = context =>
         {
-            context.Response.StatusCode = 401;  // 🔹 Prevent automatic redirection
+            context.Response.StatusCode = 401; // 🔹 Prevent automatic redirection
             return Task.CompletedTask;
         };
     })
@@ -50,7 +51,10 @@ builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationSc
             {
                 Log.Information("🟢 OnAuthenticated Triggered.");
 
-                if (context?.Principal?.Identity == null || !context.Principal.Identity.IsAuthenticated)
+                if (
+                    context?.Principal?.Identity == null
+                    || !context.Principal.Identity.IsAuthenticated
+                )
                 {
                     Log.Warning("❌ User is NOT authenticated in `OnAuthenticated`.");
                     return;
@@ -62,26 +66,32 @@ builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationSc
                 var claims = new List<Claim>
                 {
                     new Claim(ClaimTypes.Name, username),
-                    new Claim("IsInQuizContributers", "False")
+                    new Claim("IsInQuizContributers", "False"),
                 };
 
-                var identity = new ClaimsIdentity(claims, CookieAuthenticationDefaults.AuthenticationScheme);
+                var identity = new ClaimsIdentity(
+                    claims,
+                    CookieAuthenticationDefaults.AuthenticationScheme
+                );
                 var principal = new ClaimsPrincipal(identity);
 
                 var authProperties = new AuthenticationProperties
                 {
                     IsPersistent = true,
-                    ExpiresUtc = DateTime.UtcNow.AddDays(7)
+                    ExpiresUtc = DateTime.UtcNow.AddDays(7),
                 };
 
                 // ✅ Issue authentication cookie here
                 Log.Information("🚀 Issuing Authentication Cookie for: {User}", username);
-                await context.HttpContext.SignInAsync(CookieAuthenticationDefaults.AuthenticationScheme, principal, authProperties);
+                await context.HttpContext.SignInAsync(
+                    CookieAuthenticationDefaults.AuthenticationScheme,
+                    principal,
+                    authProperties
+                );
                 Log.Information("🍪 Authentication Cookie Set Successfully.");
-            }
+            },
         };
     });
-
 
 // ✅ Authorization Policies (Required for Authentication)
 builder.Services.AddAuthorization();
@@ -89,18 +99,21 @@ builder.Services.AddAuthorization();
 // ✅ Enable CORS for Next.js frontend
 builder.Services.AddCors(options =>
 {
-    options.AddPolicy("AllowNextJs",
+    options.AddPolicy(
+        "AllowNextJs",
         policy =>
         {
-            policy.WithOrigins(
-                "http://localhost:3000",
-                "https://primus.dev.local",
-                "http://192.168.2.88:3000"
-            )
-            .AllowAnyHeader()
-            .AllowAnyMethod()
-            .AllowCredentials();
-        });
+            policy
+                .WithOrigins(
+                    "http://localhost:3000",
+                    "https://primus.dev.local",
+                    "http://192.168.2.88:3000"
+                )
+                .AllowAnyHeader()
+                .AllowAnyMethod()
+                .AllowCredentials();
+        }
+    );
 });
 
 // ✅ Add Controllers
@@ -108,7 +121,8 @@ builder.Services.AddControllers();
 
 // ✅ Add Database Context
 builder.Services.AddDbContext<QuestionDbContext>(options =>
-    options.UseInMemoryDatabase("QuestionDb"));
+    options.UseInMemoryDatabase("QuestionDb")
+);
 
 // ✅ Add Swagger for API documentation
 builder.Services.AddEndpointsApiExplorer();
@@ -120,7 +134,7 @@ Log.Information("🚀 API is starting up...");
 // ✅ Correct Middleware Order
 app.UseCors("AllowNextJs");
 app.UseRouting();
-app.UseAuthentication();  // ✅ Must come before authorization
+app.UseAuthentication(); // ✅ Must come before authorization
 app.UseAuthorization();
 
 app.UseSwagger();
@@ -128,15 +142,18 @@ app.UseSwaggerUI();
 app.MapControllers();
 
 // ✅ Debug Route: List All API Endpoints
-app.MapGet("/routes", ([FromServices] EndpointDataSource endpointDataSource) =>
-{
-    var routes = endpointDataSource.Endpoints
-        .OfType<RouteEndpoint>()
-        .Select(e => e.RoutePattern.RawText)
-        .ToList();
+app.MapGet(
+    "/routes",
+    ([FromServices] EndpointDataSource endpointDataSource) =>
+    {
+        var routes = endpointDataSource
+            .Endpoints.OfType<RouteEndpoint>()
+            .Select(e => e.RoutePattern.RawText)
+            .ToList();
 
-    return Results.Ok(routes);
-});
+        return Results.Ok(routes);
+    }
+);
 
 // ✅ Ensure DB is Seeded (If necessary)
 using (var scope = app.Services.CreateScope())
@@ -145,25 +162,47 @@ using (var scope = app.Services.CreateScope())
 
     if (!dbContext.Questions.Any())
     {
-        dbContext.Questions.AddRange(new List<QuestionSimple>
-        {
-            new QuestionSimple
+        dbContext.Questions.AddRange(
+            new List<QuestionSimple>
             {
-                QuestionBody = "What is the capital of France?",
-                Category = "Geography",
-                DifficultyLevel = 20,
-                QsChecked = true,
-                Answers = new List<AnswerSimple>
+                new QuestionSimple
                 {
-                    new AnswerSimple { AnswerBody = "Paris", AnswerCorrect = true, AnswerPosition = "a" },
-                    new AnswerSimple { AnswerBody = "London", AnswerCorrect = false, AnswerPosition = "b" },
-                    new AnswerSimple { AnswerBody = "Rome", AnswerCorrect = false, AnswerPosition = "c" },
-                    new AnswerSimple { AnswerBody = "Berlin", AnswerCorrect = false, AnswerPosition = "d" }
+                    QuestionBody = "What is the capital of France?",
+                    Category = "Geography",
+                    DifficultyLevel = 20,
+                    QsChecked = true,
+                    Answers = new List<AnswerSimple>
+                    {
+                        new AnswerSimple
+                        {
+                            AnswerBody = "Paris",
+                            AnswerCorrect = true,
+                            AnswerPosition = "a",
+                        },
+                        new AnswerSimple
+                        {
+                            AnswerBody = "London",
+                            AnswerCorrect = false,
+                            AnswerPosition = "b",
+                        },
+                        new AnswerSimple
+                        {
+                            AnswerBody = "Rome",
+                            AnswerCorrect = false,
+                            AnswerPosition = "c",
+                        },
+                        new AnswerSimple
+                        {
+                            AnswerBody = "Berlin",
+                            AnswerCorrect = false,
+                            AnswerPosition = "d",
+                        },
+                    },
+                    CreatedBy = "System",
+                    Created = DateTime.UtcNow,
                 },
-                CreatedBy = "System",
-                Created = DateTime.UtcNow
             }
-        });
+        );
 
         dbContext.SaveChanges();
     }
