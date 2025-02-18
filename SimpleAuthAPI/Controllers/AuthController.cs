@@ -21,29 +21,32 @@ public class AuthController : ControllerBase
         if (user == null || !user.IsAuthenticated)
         {
             Log.Warning("❌ Negotiate Authentication failed: No valid user identity.");
-
-            // Log request headers for debugging
-            var headers = string.Join(
-                ", ",
-                HttpContext.Request.Headers.Select(h => $"[{h.Key}: {h.Value}]")
-            );
-            Log.Warning("🔍 Request Headers: {Headers}", headers);
             return Unauthorized();
         }
 
         Log.Information("✅ User {User} authenticated.", user.Name);
 
-        var claims = new List<Claim>
+        // Check if the user belongs to a specific Windows Group
+        bool isInQuizContributors = false;
+        string groupName = "SU-CG-K2Dev-Workspace"; // Change this to your actual AD group
+
+        using (var context = new PrincipalContext(ContextType.Domain))
+        using (var principal = UserPrincipal.FindByIdentity(context, user.Name))
         {
-            new Claim(ClaimTypes.Name, user.Name),
-            new Claim("IsInQuizContributers", "True"),
-        };
+            if (principal != null)
+            {
+                isInQuizContributors = principal.GetGroups()
+                    .Any(g => g.Name.Equals(groupName, StringComparison.OrdinalIgnoreCase));
+            }
+        }
 
-        var claimsIdentity = new ClaimsIdentity(
-            claims,
-            CookieAuthenticationDefaults.AuthenticationScheme
-        );
+        var claims = new List<Claim>
+    {
+        new Claim(ClaimTypes.Name, user.Name),
+        new Claim("IsInQuizContributers", isInQuizContributors.ToString()), // Set dynamically
+    };
 
+        var claimsIdentity = new ClaimsIdentity(claims, CookieAuthenticationDefaults.AuthenticationScheme);
         var claimsPrincipal = new ClaimsPrincipal(claimsIdentity);
         var authProperties = new AuthenticationProperties
         {
@@ -51,16 +54,9 @@ public class AuthController : ControllerBase
             ExpiresUtc = DateTime.UtcNow.AddDays(7),
         };
 
-        await HttpContext.SignInAsync(
-            CookieAuthenticationDefaults.AuthenticationScheme,
-            claimsPrincipal,
-            authProperties
-        );
+        await HttpContext.SignInAsync(CookieAuthenticationDefaults.AuthenticationScheme, claimsPrincipal, authProperties);
 
-        var cookieHeader = HttpContext.Response.Headers["Set-Cookie"];
-        Log.Information("🚀 API Response Headers: {Headers}", cookieHeader);
-
-        return Ok(new { User = user.Name, IsInQuizContributers = true });
+        return Ok(new { User = user.Name, IsInQuizContributers = isInQuizContributors });
     }
 
     [HttpGet("user")]
@@ -99,39 +95,39 @@ public class AuthController : ControllerBase
         return Ok(new { Message = "Logged out successfully" });
     }
 
-    private bool IsUserInGroup(WindowsIdentity? identity, string groupName)
-    {
-        if (identity == null)
-            return false;
+    //private bool IsUserInGroup(WindowsIdentity? identity, string groupName)
+    //{
+    //    if (identity == null)
+    //        return false;
 
-        try
-        {
-            var groups = identity
-                .Groups?.Select(g => g.Translate(typeof(NTAccount)).Value)
-                .ToList();
-            if (groups != null)
-            {
-                foreach (var g in groups)
-                {
-                    Log.Information("🔍 Checking Group (SID-based): {GroupName}", g);
-                    if (g.EndsWith(groupName, StringComparison.OrdinalIgnoreCase))
-                    {
-                        Log.Information(
-                            "✅ User {User} IS IN GROUP: {GroupName}",
-                            identity.Name,
-                            groupName
-                        );
-                        return true;
-                    }
-                }
-            }
-        }
-        catch (Exception ex)
-        {
-            Log.Error("⚠ Error checking user groups: {Message}", ex.Message);
-        }
+    //    try
+    //    {
+    //        var groups = identity
+    //            .Groups?.Select(g => g.Translate(typeof(NTAccount)).Value)
+    //            .ToList();
+    //        if (groups != null)
+    //        {
+    //            foreach (var g in groups)
+    //            {
+    //                Log.Information("🔍 Checking Group (SID-based): {GroupName}", g);
+    //                if (g.EndsWith(groupName, StringComparison.OrdinalIgnoreCase))
+    //                {
+    //                    Log.Information(
+    //                        "✅ User {User} IS IN GROUP: {GroupName}",
+    //                        identity.Name,
+    //                        groupName
+    //                    );
+    //                    return true;
+    //                }
+    //            }
+    //        }
+    //    }
+    //    catch (Exception ex)
+    //    {
+    //        Log.Error("⚠ Error checking user groups: {Message}", ex.Message);
+    //    }
 
-        Log.Warning("❌ User {User} NOT in group {GroupName}", identity?.Name, groupName);
-        return false;
-    }
+    //    Log.Warning("❌ User {User} NOT in group {GroupName}", identity?.Name, groupName);
+    //    return false;
+    //}
 }
