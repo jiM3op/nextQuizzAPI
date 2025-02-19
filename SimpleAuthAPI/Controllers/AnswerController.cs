@@ -1,7 +1,6 @@
-﻿using SimpleAuthAPI.Data;
+﻿namespace SimpleAuthAPI.Controllers;
 
-namespace SimpleAuthAPI.Controllers;
-
+using Data;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Logging;
 using System.Collections.Generic;
