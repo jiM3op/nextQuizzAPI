@@ -120,7 +120,7 @@ builder.Services.AddCors(options =>
 builder.Services.AddControllers();
 
 // ✅ Add Database Context
-builder.Services.AddDbContext<QuestionDbContext>(options =>
+builder.Services.AddDbContext<ApplicationDbContext>(options =>
     options.UseInMemoryDatabase("QuestionDb")
 );
 
@@ -158,7 +158,7 @@ app.MapGet(
 // ✅ Ensure DB is Seeded (If necessary)
 using (var scope = app.Services.CreateScope())
 {
-    var dbContext = scope.ServiceProvider.GetRequiredService<QuestionDbContext>();
+    var dbContext = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
 
     if (!dbContext.Questions.Any())
     {
