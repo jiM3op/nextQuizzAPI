@@ -15,6 +15,7 @@ public class AuthController : ControllerBase
     [AllowAnonymous]
     public async Task<IActionResult> Authenticate()
     {
+        // bla
         var windowsPrincipal = HttpContext.User as WindowsPrincipal;
         var user = windowsPrincipal?.Identity as WindowsIdentity;
 
