@@ -9,6 +9,8 @@ namespace SimpleAuthAPI.Data
 
         public DbSet<QuestionSimple> Questions { get; set; }
         public DbSet<AnswerSimple> Answers { get; set; }
+        
+        public DbSet<Category> Categories { get; set; }
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
@@ -17,6 +19,8 @@ namespace SimpleAuthAPI.Data
                 .WithMany(q => q.Answers)
                 .HasForeignKey(a => a.QuestionSimpleId)
                 .OnDelete(DeleteBehavior.Cascade); // ✅ Ensure answers are deleted when their question is deleted
+                
+            modelBuilder.Entity<Category>().HasIndex(c => c.Value).IsUnique();
         }
 
     }
