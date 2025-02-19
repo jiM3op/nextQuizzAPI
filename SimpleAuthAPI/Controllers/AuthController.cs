@@ -95,7 +95,8 @@ public class AuthController : ControllerBase
         );
         return Ok(new { Message = "Logged out successfully" });
     }
-
+    
+    // Not usesd anymore!
     //private bool IsUserInGroup(WindowsIdentity? identity, string groupName)
     //{
     //    if (identity == null)
