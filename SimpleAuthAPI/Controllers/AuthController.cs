@@ -1,6 +1,9 @@
 ﻿using System.DirectoryServices.AccountManagement;
+using System.Net.Http;
 using System.Security.Claims;
 using System.Security.Principal;
+using System.Text.Json;
+using System.Text;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Authorization;
@@ -11,6 +14,15 @@ using Serilog;
 [ApiController]
 public class AuthController : ControllerBase
 {
+
+    // Constructor for Depenency Injection of HTTPClientFactory
+    private readonly HttpClient _httpClient;
+    
+    public AuthController(IHttpClientFactory httpClientFactory)
+    {
+        _httpClient = httpClientFactory.CreateClient("UserManagementAPI");
+    }
+
     [HttpGet("authenticate")]
     [AllowAnonymous]
     public async Task<IActionResult> Authenticate()
@@ -31,7 +43,8 @@ public class AuthController : ControllerBase
         bool isInQuizContributors = false;
         string groupName = "SU-CG-K2Dev-Workspace"; // Change this to your actual AD group
 
-        using (var context = new PrincipalContext(ContextType.Domain))
+        //using (var context = new PrincipalContext(ContextType.Domain))
+        using (var context = new PrincipalContext(ContextType.Machine))
         using (var principal = UserPrincipal.FindByIdentity(context, user.Name))
         {
             if (principal != null)
@@ -56,6 +69,12 @@ public class AuthController : ControllerBase
         };
 
         await HttpContext.SignInAsync(CookieAuthenticationDefaults.AuthenticationScheme, claimsPrincipal, authProperties);
+
+        var userData = new { Username = user.Name, Email = $"{user.Name}@example.com", Role = "User" };
+        var jsonContent = new StringContent(JsonSerializer.Serialize(userData), Encoding.UTF8, "application/json");
+
+        await _httpClient.PostAsync("http://localhost:8080/api/UserManagement/store-user", jsonContent);
+
 
         return Ok(new { User = user.Name, IsInQuizContributers = isInQuizContributors });
     }

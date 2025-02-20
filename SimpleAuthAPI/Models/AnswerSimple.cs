@@ -1,7 +1,7 @@
 ﻿using System.Text.Json.Serialization;
 using System.ComponentModel.DataAnnotations; // ✅ Fix for [Key]
 using System.ComponentModel.DataAnnotations.Schema; // ✅ Fix for [DatabaseGenerated]
-using System.Text.Json.Serialization; // ✅ Required for JSON serialization
+
 
 
 namespace SimpleAuthAPI.Models

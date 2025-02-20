@@ -21,6 +21,24 @@ public class AnswerController : ControllerBase
         _logger = logger;
     }
 
+    // ✅ NEW: Create a Single Answer
+    [HttpPost]
+    public async Task<IActionResult> CreateAnswer([FromBody] AnswerSimple newAnswer)
+    {
+        if (newAnswer == null)
+        {
+            return BadRequest("Invalid answer data.");
+        }
+
+        _logger.LogInformation("📩 Creating new answer: {AnswerBody}", newAnswer.AnswerBody);
+
+        newAnswer.Id = 0;  // Ensure ID is set correctly
+        _context.Answers.Add(newAnswer);
+        await _context.SaveChangesAsync();
+
+        return CreatedAtAction(nameof(GetAnswer), new { id = newAnswer.Id }, newAnswer);
+    }
+
     // ✅ GET: Fetch a single answer
     [HttpGet("{id}")]
     public async Task<IActionResult> GetAnswer(int id)

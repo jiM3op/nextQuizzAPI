@@ -124,6 +124,9 @@ builder.Services.AddDbContext<ApplicationDbContext>(options =>
     options.UseInMemoryDatabase("QuestionDb")
 );
 
+// ✅ Add HTTP Client to update Users at login
+builder.Services.AddHttpClient();
+
 // ✅ Add Swagger for API documentation
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
@@ -155,58 +158,6 @@ app.MapGet(
     }
 );
 
-// ✅ Ensure DB is Seeded (If necessary)
-using (var scope = app.Services.CreateScope())
-{
-    var dbContext = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
-
-    if (!dbContext.Questions.Any())
-    {
-        dbContext.Questions.AddRange(
-            new List<QuestionSimple>
-            {
-                new QuestionSimple
-                {
-                    QuestionBody = "What is the capital of France?",
-                    Category = "Geography",
-                    DifficultyLevel = 20,
-                    QsChecked = true,
-                    Answers = new List<AnswerSimple>
-                    {
-                        new AnswerSimple
-                        {
-                            AnswerBody = "Paris",
-                            AnswerCorrect = true,
-                            AnswerPosition = "a",
-                        },
-                        new AnswerSimple
-                        {
-                            AnswerBody = "London",
-                            AnswerCorrect = false,
-                            AnswerPosition = "b",
-                        },
-                        new AnswerSimple
-                        {
-                            AnswerBody = "Rome",
-                            AnswerCorrect = false,
-                            AnswerPosition = "c",
-                        },
-                        new AnswerSimple
-                        {
-                            AnswerBody = "Berlin",
-                            AnswerCorrect = false,
-                            AnswerPosition = "d",
-                        },
-                    },
-                    CreatedBy = "System",
-                    Created = DateTime.UtcNow,
-                },
-            }
-        );
-
-        dbContext.SaveChanges();
-    }
-}
 
 // ✅ Start API
 app.Run();
