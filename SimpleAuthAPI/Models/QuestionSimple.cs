@@ -23,6 +23,8 @@ namespace SimpleAuthAPI.Models
         public List<AnswerSimple> Answers { get; set; } = new();
 
         // ✅ New Relationship to Category Model
-        public List<Category> Categories { get; set; } = new();
+        //public List<Category> Categories { get; set; } = new();
+        [Required]
+        public List<int> Categories { get; set; }  // ✅ Now stores just category IDs
     }
 }

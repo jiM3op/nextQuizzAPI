@@ -76,5 +76,19 @@ namespace SimpleAuthAPI.Controllers
 
             return NoContent();
         }
+
+        [HttpGet("usage")]
+        public async Task<IActionResult> GetCategoryUsage()
+        {
+            var categoryUsage = await _context.Categories
+                .Select(c => new
+                {
+                    CategoryId = c.Id,
+                    UsageCount = _context.Questions.Count(q => q.Categories.Contains(c.Id))
+                })
+                .ToListAsync();
+
+            return Ok(categoryUsage);
+        }
     }
 }
