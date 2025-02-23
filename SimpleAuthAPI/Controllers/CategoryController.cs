@@ -77,6 +77,7 @@ namespace SimpleAuthAPI.Controllers
             return NoContent();
         }
 
+        // Get Usagecount in QuestionSimple Objects
         [HttpGet("usage")]
         public async Task<IActionResult> GetCategoryUsage()
         {
