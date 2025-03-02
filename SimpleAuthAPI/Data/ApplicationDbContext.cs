@@ -13,6 +13,9 @@ namespace SimpleAuthAPI.Data
 
         public DbSet<User> Users { get; set; }
 
+        public DbSet<Quiz> Quizzes { get; set; }
+        public DbSet<QuizQuestion> QuizQuestions { get; set; }
+
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
             // ✅ Ensure each Answer belongs to a Question & is deleted when Question is deleted
