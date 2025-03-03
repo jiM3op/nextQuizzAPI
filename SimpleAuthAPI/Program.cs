@@ -6,7 +6,9 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Serilog;
 using SimpleAuthAPI.Data;
-using SimpleAuthAPI.Models;
+using Microsoft.AspNetCore.Mvc.NewtonsoftJson;
+using Newtonsoft.Json;
+
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -117,7 +119,13 @@ builder.Services.AddCors(options =>
 });
 
 // ✅ Add Controllers
-builder.Services.AddControllers();
+builder.Services.AddControllers()
+    .AddNewtonsoftJson(options =>
+    {
+        options.SerializerSettings.ReferenceLoopHandling = ReferenceLoopHandling.Ignore;
+        options.SerializerSettings.NullValueHandling = NullValueHandling.Ignore;
+        options.SerializerSettings.Formatting = Formatting.Indented;
+    });
 
 // ✅ Add Database Context
 builder.Services.AddDbContext<ApplicationDbContext>(options =>
