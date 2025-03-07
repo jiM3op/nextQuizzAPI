@@ -14,7 +14,6 @@ namespace SimpleAuthAPI.Models
 
         [Required]
         public int DifficultyLevel { get; set; }
-
         public bool QsChecked { get; set; }
         public string? CreatedBy { get; set; }
         public DateTime Created { get; set; }
