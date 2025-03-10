@@ -95,6 +95,20 @@ public class QuizSessionController : ControllerBase
         newSession.Status = "in-progress";
         newSession.CurrentQuestionIndex = 0;
 
+        // If metadata is provided as a complex object, serialize it
+        if (newSession.Metadata != null && !newSession.Metadata.StartsWith("{"))
+        {
+            // This means it came as an object from the client and needs serializing
+            try
+            {
+                newSession.Metadata = System.Text.Json.JsonSerializer.Serialize(newSession.Metadata);
+            }
+            catch
+            {
+                // If serialization fails, just use it as is - it might already be a string
+            }
+        }
+
         // Clear any provided answers - they should be added separately
         newSession.UserAnswers = new List<UserAnswer>();
 

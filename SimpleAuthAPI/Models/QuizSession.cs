@@ -12,5 +12,7 @@ public class QuizSession
     public double? Score { get; set; }
     public int? MaxDuration { get; set; } // Optional parameter for time limit in minutes
 
+    public string? Metadata { get; set; } // Stored as JSON string
+
     public ICollection<UserAnswer> UserAnswers { get; set; } = new List<UserAnswer>();
 }
