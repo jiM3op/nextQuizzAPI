@@ -39,6 +39,13 @@ public class AuthController : ControllerBase
 
         Log.Information("✅ User {User} authenticated.", user.Name);
 
+        // Default values if we can't retrieve the actual names
+        string firstName = "";
+        string lastName = "";
+        string displayName = "";
+        string email = $"{user.Name}@example.com"; // Default email
+
+
         // Check if the user belongs to a specific Windows Group
         bool isInQuizContributors = false;
         string groupName = "SU-CG-K2Dev-Workspace"; // Change this to your actual AD group
@@ -51,6 +58,18 @@ public class AuthController : ControllerBase
             {
                 isInQuizContributors = principal.GetGroups()
                     .Any(g => g.Name.Equals(groupName, StringComparison.OrdinalIgnoreCase));
+
+                // Get user's personal details
+                firstName = principal.GivenName ?? "";
+                lastName = principal.Surname ?? "";
+                displayName = principal.DisplayName ?? $"{firstName} {lastName}".Trim();
+
+                // Try to get email from principal if available
+                if (!string.IsNullOrEmpty(principal.EmailAddress))
+                {
+                    email = principal.EmailAddress;
+                }
+
             }
         }
 
@@ -58,6 +77,10 @@ public class AuthController : ControllerBase
     {
         new Claim(ClaimTypes.Name, user.Name),
         new Claim("IsInQuizContributers", isInQuizContributors.ToString()), // Set dynamically
+        new Claim(ClaimTypes.GivenName, firstName),
+        new Claim(ClaimTypes.Surname, lastName),
+        new Claim("DisplayName", displayName),
+        new Claim(ClaimTypes.Email, email)
     };
 
         var claimsIdentity = new ClaimsIdentity(claims, CookieAuthenticationDefaults.AuthenticationScheme);
@@ -70,13 +93,27 @@ public class AuthController : ControllerBase
 
         await HttpContext.SignInAsync(CookieAuthenticationDefaults.AuthenticationScheme, claimsPrincipal, authProperties);
 
-        var userData = new { Username = user.Name, Email = $"{user.Name}@example.com", Role = "User" };
+        var userData = new { Username = user.Name,
+            Email = email,
+            FirstName = firstName,
+            LastName = lastName,
+            DisplayName = displayName,
+            Role = "User"
+        };
         var jsonContent = new StringContent(JsonSerializer.Serialize(userData), Encoding.UTF8, "application/json");
 
         await _httpClient.PostAsync("http://localhost:8080/api/UserManagement/store-user", jsonContent);
 
 
-        return Ok(new { User = user.Name, IsInQuizContributers = isInQuizContributors });
+        return Ok(new
+        {
+            User = user.Name,
+            IsInQuizContributers = isInQuizContributors,
+            FirstName = firstName,
+            LastName = lastName,
+            DisplayName = displayName,
+            Email = email
+        });
     }
 
     [HttpGet("user")]
@@ -114,41 +151,4 @@ public class AuthController : ControllerBase
         );
         return Ok(new { Message = "Logged out successfully" });
     }
-    
-    // Not usesd anymore!
-    //private bool IsUserInGroup(WindowsIdentity? identity, string groupName)
-    //{
-    //    if (identity == null)
-    //        return false;
-
-    //    try
-    //    {
-    //        var groups = identity
-    //            .Groups?.Select(g => g.Translate(typeof(NTAccount)).Value)
-    //            .ToList();
-    //        if (groups != null)
-    //        {
-    //            foreach (var g in groups)
-    //            {
-    //                Log.Information("🔍 Checking Group (SID-based): {GroupName}", g);
-    //                if (g.EndsWith(groupName, StringComparison.OrdinalIgnoreCase))
-    //                {
-    //                    Log.Information(
-    //                        "✅ User {User} IS IN GROUP: {GroupName}",
-    //                        identity.Name,
-    //                        groupName
-    //                    );
-    //                    return true;
-    //                }
-    //            }
-    //        }
-    //    }
-    //    catch (Exception ex)
-    //    {
-    //        Log.Error("⚠ Error checking user groups: {Message}", ex.Message);
-    //    }
-
-    //    Log.Warning("❌ User {User} NOT in group {GroupName}", identity?.Name, groupName);
-    //    return false;
-    //}
 }

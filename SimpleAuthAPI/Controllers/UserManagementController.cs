@@ -45,19 +45,22 @@ public class UserManagementController : ControllerBase
         {
             // ✅ Check if the user already exists
             var existingUser = await _context.Users
-                .FirstOrDefaultAsync(u => u.UserName == userDto.Username);
+                .FirstOrDefaultAsync(u => u.UserName == userDto.UserName);
 
             if (existingUser != null)
             {
-                _logger.LogInformation("✅ User {Username} already exists. Skipping creation.", userDto.Username);
+                _logger.LogInformation("✅ User {Username} already exists. Skipping creation.", userDto.UserName);
                 return Ok(new { Message = "User already exists.", User = existingUser });
             }
 
             // ✅ Convert UserDto to User entity
             var newUser = new User
             {
-                UserName = userDto.Username, // Ensure this matches your DB column
+                UserName = userDto.UserName, // Ensure this matches your DB column
                 Email = userDto.Email,
+                FirstName = userDto.FirstName,
+                LastName = userDto.LastName,
+                DisplayName = userDto.DisplayName,
                 Role = userDto.Role
             };
 

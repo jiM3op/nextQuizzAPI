@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text.Json;
 using System.Threading.Tasks;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using SimpleAuthAPI.Data;
@@ -31,6 +32,7 @@ public class QuizController : ControllerBase
         return await _context.Quizzes
             .Include(q => q.Questions)
                 .ThenInclude(qq => qq.Question)
+            .Include(q => q.Creator) // Include the creator
             .AsNoTracking()
             .ToListAsync();
     }
@@ -44,6 +46,7 @@ public class QuizController : ControllerBase
         var quiz = await _context.Quizzes
             .Include(q => q.Questions)
                 .ThenInclude(qq => qq.Question)
+            .Include(q => q.Creator) // Include the creator
             .AsNoTracking()
             .FirstOrDefaultAsync(q => q.Id == id);
 
@@ -67,6 +70,7 @@ public class QuizController : ControllerBase
             .Include(q => q.Questions)
                 .ThenInclude(qq => qq.Question)
                     .ThenInclude(q => q.Answers)
+            .Include(q => q.Creator) // Include the creator
             .AsNoTracking()
             .FirstOrDefaultAsync(q => q.Id == id);
 
@@ -81,6 +85,7 @@ public class QuizController : ControllerBase
 
     // POST: api/Quiz
     [HttpPost]
+    [Authorize] // Require authentication
     public async Task<ActionResult<Quiz>> CreateQuiz(QuizDTO quizDto)
     {
         try
@@ -105,11 +110,20 @@ public class QuizController : ControllerBase
                 return BadRequest(ModelState);
             }
 
+            // Get the current user
+            var userName = HttpContext.User.Identity?.Name;
+            var user = await _context.Users.FirstOrDefaultAsync(u => u.UserName == userName);
+
+            if (user == null)
+            {
+                return BadRequest("User not found or not authenticated");
+            }
+
             // Create the quiz
             var quiz = new Quiz
             {
                 QuizName = quizDto.QuizName,
-                CreatedBy = quizDto.CreatedBy ?? "Anonymous",
+                CreatedById = user.Id, // Set the foreign key
                 CreatedAt = DateTime.UtcNow
             };
 
@@ -160,6 +174,7 @@ public class QuizController : ControllerBase
 
     // PUT: api/Quiz/5
     [HttpPut("{id}")]
+    [Authorize] // Require authentication
     public async Task<IActionResult> UpdateQuiz(int id, QuizDTO quizDto)
     {
         try
@@ -176,6 +191,7 @@ public class QuizController : ControllerBase
 
             var quiz = await _context.Quizzes
                 .Include(q => q.Questions)
+                .Include(q => q.Creator) // Include the creator
                 .FirstOrDefaultAsync(q => q.Id == id);
 
             if (quiz == null)
@@ -184,9 +200,23 @@ public class QuizController : ControllerBase
                 return NotFound();
             }
 
+            // Check if current user is the creator or has admin rights
+            var currentUserName = HttpContext.User.Identity?.Name;
+            var currentUser = await _context.Users.FirstOrDefaultAsync(u => u.UserName == currentUserName);
+
+            bool isAdmin = HttpContext.User.Claims
+                .Any(c => c.Type == "IsInQuizContributers" && c.Value == "True");
+
+            // Only allow the creator or admins to update the quiz
+            if (quiz.CreatedById != currentUser?.Id && !isAdmin)
+            {
+                return Forbid("Only the creator or administrators can update this quiz");
+            }
+
             // Update basic properties
             quiz.QuizName = quizDto.QuizName;
             quiz.LastModifiedAt = DateTime.UtcNow;
+            // Do not update CreatedById - keep the original creator
 
             // Clear existing questions
             _logger.LogInformation("Removing {ExistingQuestionCount} existing questions from quiz ID: {QuizId}",
@@ -251,17 +281,34 @@ public class QuizController : ControllerBase
 
     // POST: api/Quiz/5/questions/10
     [HttpPost("{quizId}/questions/{questionId}")]
+    [Authorize] // Require authentication
     public async Task<IActionResult> AddQuestionToQuiz(int quizId, int questionId)
     {
         try
         {
             _logger.LogInformation("Adding question ID: {QuestionId} to quiz ID: {QuizId}", questionId, quizId);
 
-            var quiz = await _context.Quizzes.FindAsync(quizId);
+            var quiz = await _context.Quizzes
+                .Include(q => q.Creator)
+                .FirstOrDefaultAsync(q => q.Id == quizId);
+
             if (quiz == null)
             {
                 _logger.LogWarning("Quiz with ID {QuizId} not found when adding question", quizId);
                 return NotFound("Quiz not found");
+            }
+
+            // Check if current user is the creator or has admin rights
+            var currentUserName = HttpContext.User.Identity?.Name;
+            var currentUser = await _context.Users.FirstOrDefaultAsync(u => u.UserName == currentUserName);
+
+            bool isAdmin = HttpContext.User.Claims
+                .Any(c => c.Type == "IsInQuizContributers" && c.Value == "True");
+
+            // Only allow the creator or admins to modify the quiz
+            if (quiz.CreatedById != currentUser?.Id && !isAdmin)
+            {
+                return Forbid("Only the creator or administrators can modify this quiz");
             }
 
             var question = await _context.Questions.FindAsync(questionId);
@@ -310,11 +357,35 @@ public class QuizController : ControllerBase
 
     // DELETE: api/Quiz/5/questions/10
     [HttpDelete("{quizId}/questions/{questionId}")]
+    [Authorize] // Require authentication
     public async Task<IActionResult> RemoveQuestionFromQuiz(int quizId, int questionId)
     {
         try
         {
             _logger.LogInformation("Removing question ID: {QuestionId} from quiz ID: {QuizId}", questionId, quizId);
+
+            var quiz = await _context.Quizzes
+                .Include(q => q.Creator)
+                .FirstOrDefaultAsync(q => q.Id == quizId);
+
+            if (quiz == null)
+            {
+                _logger.LogWarning("Quiz with ID {QuizId} not found when removing question", quizId);
+                return NotFound("Quiz not found");
+            }
+
+            // Check if current user is the creator or has admin rights
+            var currentUserName = HttpContext.User.Identity?.Name;
+            var currentUser = await _context.Users.FirstOrDefaultAsync(u => u.UserName == currentUserName);
+
+            bool isAdmin = HttpContext.User.Claims
+                .Any(c => c.Type == "IsInQuizContributers" && c.Value == "True");
+
+            // Only allow the creator or admins to modify the quiz
+            if (quiz.CreatedById != currentUser?.Id && !isAdmin)
+            {
+                return Forbid("Only the creator or administrators can modify this quiz");
+            }
 
             var quizQuestion = await _context.QuizQuestions
                 .FirstOrDefaultAsync(qq => qq.QuizId == quizId && qq.QuestionId == questionId);
@@ -341,6 +412,7 @@ public class QuizController : ControllerBase
 
     // DELETE: api/Quiz/5
     [HttpDelete("{id}")]
+    [Authorize] // Require authentication
     public async Task<IActionResult> DeleteQuiz(int id)
     {
         try
@@ -349,12 +421,26 @@ public class QuizController : ControllerBase
 
             var quiz = await _context.Quizzes
                 .Include(q => q.Questions)
+                .Include(q => q.Creator)
                 .FirstOrDefaultAsync(q => q.Id == id);
 
             if (quiz == null)
             {
                 _logger.LogWarning("Quiz with ID {QuizId} not found when trying to delete", id);
                 return NotFound();
+            }
+
+            // Check if current user is the creator or has admin rights
+            var currentUserName = HttpContext.User.Identity?.Name;
+            var currentUser = await _context.Users.FirstOrDefaultAsync(u => u.UserName == currentUserName);
+
+            bool isAdmin = HttpContext.User.Claims
+                .Any(c => c.Type == "IsInQuizContributers" && c.Value == "True");
+
+            // Only allow the creator or admins to delete the quiz
+            if (quiz.CreatedById != currentUser?.Id && !isAdmin)
+            {
+                return Forbid("Only the creator or administrators can delete this quiz");
             }
 
             // Remove all question associations
@@ -376,17 +462,52 @@ public class QuizController : ControllerBase
         }
     }
 
+    // New endpoint: Get quizzes created by a specific user
+    [HttpGet("created-by/{userId}")]
+    [Authorize]
+    public async Task<IActionResult> GetQuizzesByUser(int userId)
+    {
+        try
+        {
+            // Check if the current user is authorized to view this user's quizzes
+            var currentUserName = HttpContext.User.Identity?.Name;
+            var currentUser = await _context.Users.FirstOrDefaultAsync(u => u.UserName == currentUserName);
+
+            bool isAdmin = HttpContext.User.Claims
+                .Any(c => c.Type == "IsInQuizContributers" && c.Value == "True");
+
+            // Only allow users to see their own quizzes or admins to see any user's quizzes
+            if (currentUser?.Id != userId && !isAdmin)
+            {
+                return Forbid("You can only view your own created quizzes");
+            }
+
+            var quizzes = await _context.Quizzes
+                .Where(q => q.CreatedById == userId)
+                .Include(q => q.Questions)
+                .OrderByDescending(q => q.CreatedAt)
+                .ToListAsync();
+
+            return Ok(quizzes);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error getting quizzes for user ID {UserId}: {ErrorMessage}", userId, ex.Message);
+            return StatusCode(500, "An error occurred while retrieving quizzes");
+        }
+    }
+
     private bool QuizExists(int id)
     {
         return _context.Quizzes.Any(e => e.Id == id);
     }
 }
 
-// DTO for quiz operations
+// Updated DTO for quiz operations
 public class QuizDTO
 {
     public int Id { get; set; }
     public string QuizName { get; set; }
     public List<int> QuestionIds { get; set; }
-    public string CreatedBy { get; set; }
+    // CreatedBy is no longer needed as we get it from the authenticated user
 }

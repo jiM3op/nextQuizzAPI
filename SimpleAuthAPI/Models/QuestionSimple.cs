@@ -15,14 +15,21 @@ namespace SimpleAuthAPI.Models
         [Required]
         public int DifficultyLevel { get; set; }
         public bool QsChecked { get; set; }
-        public string? CreatedBy { get; set; }
+
+        // Foreign key to User table
+        public int CreatedById { get; set; }
+
+        // Navigation property - MAKE NULLABLE
+        [ForeignKey("CreatedById")]
+        [JsonIgnore] // This prevents the property from being required in JSON
+        public User? Creator { get; set; }
+
         public DateTime Created { get; set; }
 
         // ✅ Ensure this is always initialized
         public List<AnswerSimple> Answers { get; set; } = new();
 
-        // ✅ New Relationship to Category Model
-        //public List<Category> Categories { get; set; } = new();
+        // ✅ Relationship to Category Model
         [Required]
         public List<int> Categories { get; set; }  // ✅ Now stores just category IDs
     }

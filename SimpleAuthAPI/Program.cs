@@ -44,6 +44,7 @@ builder
             context.Response.StatusCode = 401; // 🔹 Prevent automatic redirection
             return Task.CompletedTask;
         };
+        
     })
     .AddNegotiate(options =>
     {
@@ -98,6 +99,13 @@ builder
 // ✅ Authorization Policies (Required for Authentication)
 builder.Services.AddAuthorization();
 
+// ✅ Authorization Policies (add this right after your authentication setup)
+builder.Services.AddAuthorization(options =>
+{
+    options.AddPolicy("ContributorOnly", policy =>
+        policy.RequireClaim("IsInQuizContributers", "True"));
+});
+
 // ✅ Enable CORS for Next.js frontend
 builder.Services.AddCors(options =>
 {
@@ -127,9 +135,18 @@ builder.Services.AddControllers()
         options.SerializerSettings.Formatting = Formatting.Indented;
     });
 
-// ✅ Add Database Context
+// ✅ Add Database Context (inMemory)
+//builder.Services.AddDbContext<ApplicationDbContext>(options =>
+//    options.UseInMemoryDatabase("QuestionDb")
+//);
+
+
+// ✅ Add Database Context (SQL)
 builder.Services.AddDbContext<ApplicationDbContext>(options =>
-    options.UseInMemoryDatabase("QuestionDb")
+    options.UseSqlServer(
+        builder.Configuration.GetConnectionString("DefaultConnection"),
+        sqlServerOptions => sqlServerOptions.EnableRetryOnFailure()
+    )
 );
 
 // ✅ Add HTTP Client to update Users at login

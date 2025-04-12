@@ -262,7 +262,7 @@ public class QuizSessionController : ControllerBase
             {
                 quiz.Id,
                 quiz.QuizName,
-                quiz.CreatedBy,
+                quiz.CreatedById,
                 quiz.CreatedAt
             },
             TotalQuestions = totalQuestions,

@@ -36,6 +36,25 @@ namespace SimpleAuthAPI.Data
             //     .HasMany(q => q.Categories)
             //     .WithMany(c => c.Questions); 
 
+            // ✅ Prevent cascade delete conflicts with User
+            modelBuilder.Entity<QuestionSimple>()
+                .HasOne(q => q.Creator)
+                .WithMany(u => u.CreatedQuestions)
+                .HasForeignKey(q => q.CreatedById)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            modelBuilder.Entity<Quiz>()
+                .HasOne(q => q.Creator)
+                .WithMany(u => u.CreatedQuizzes)
+                .HasForeignKey(q => q.CreatedById)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            modelBuilder.Entity<QuizSession>()
+                .HasOne(qs => qs.User)
+                .WithMany(u => u.QuizSessions)
+                .HasForeignKey(qs => qs.UserId)
+                .OnDelete(DeleteBehavior.Restrict);
+
             base.OnModelCreating(modelBuilder);
         }
     }
