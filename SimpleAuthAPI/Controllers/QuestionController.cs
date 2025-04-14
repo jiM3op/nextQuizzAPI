@@ -342,4 +342,127 @@ public class QuestionController : ControllerBase
 
         return Ok(questions);
     }
+
+    [HttpPost("bulk-import")]
+    [Authorize(Policy = "ContributorOnly")]
+    public async Task<IActionResult> BulkImportQuestions([FromBody] List<QuestionSimple> questions)
+    {
+        if (questions == null || !questions.Any())
+        {
+            return BadRequest("No questions provided for import.");
+        }
+
+        _logger.LogInformation("📥 Bulk importing {Count} questions", questions.Count);
+
+        // Get the current user
+        var userName = HttpContext.User.Identity?.Name;
+        var user = await _context.Users.FirstOrDefaultAsync(u => u.UserName == userName);
+
+        if (user == null)
+        {
+            return BadRequest("User not found or not authenticated");
+        }
+
+        int importedCount = 0;
+        List<int> createdQuestionIds = new List<int>();
+        List<string> errors = new List<string>();
+
+        foreach (var question in questions)
+        {
+            try
+            {
+                // Reset IDs to ensure we're creating new records
+                question.Id = 0;
+
+                // Set creation metadata
+                question.CreatedById = user.Id;
+                question.Creator = null; // Don't import the creator object, use the current user instead
+                question.Created = DateTime.UtcNow;
+
+                // Reset answer IDs and ensure they're linked to the question
+                foreach (var answer in question.Answers)
+                {
+                    answer.Id = 0;
+                    answer.QuestionSimpleId = 0; // This will be set by EF Core after the question is saved
+                }
+
+                // Validate categories exist
+                List<Category> resolvedCategories = new List<Category>();
+                if (question.Categories != null)
+                {
+                    foreach (var categoryId in question.Categories)
+                    {
+                        var existingCategory = await _context.Categories.FindAsync(categoryId);
+                        if (existingCategory != null)
+                        {
+                            resolvedCategories.Add(existingCategory);
+                        }
+                        else
+                        {
+                            _logger.LogWarning("Category with ID {CategoryId} not found, skipping", categoryId);
+                        }
+                    }
+                    question.Categories = resolvedCategories.Select(c => c.Id).ToList();
+                }
+
+                // Add question to context
+                _context.Questions.Add(question);
+                await _context.SaveChangesAsync();
+
+                importedCount++;
+                createdQuestionIds.Add(question.Id);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error importing question: {QuestionBody}", question.QuestionBody);
+                errors.Add($"Error importing question: {question.QuestionBody?.Substring(0, Math.Min(50, question.QuestionBody?.Length ?? 0))}... - {ex.Message}");
+            }
+        }
+
+        return Ok(new
+        {
+            Success = true,
+            ImportedCount = importedCount,
+            CreatedQuestionIds = createdQuestionIds,
+            Errors = errors
+        });
+    }
+
+    // Add this endpoint to the QuestionController class
+
+    [HttpGet("export")]
+    [Authorize(Policy = "ContributorOnly")]
+    public async Task<IActionResult> ExportQuestions()
+    {
+        _logger.LogInformation("📤 Exporting all questions as JSON");
+
+        try
+        {
+            var questions = await _context.Questions
+                .Include(q => q.Answers)
+                .Include(q => q.Creator) // Include the creator
+                .ToListAsync();
+
+            // Resolve categories for each question
+            var categoryDictionary = await _context.Categories.ToDictionaryAsync(c => c.Id);
+
+            foreach (var question in questions)
+            {
+                // Ensure categories are correctly populated
+                question.Categories = question.Categories
+                    .Where(id => categoryDictionary.ContainsKey(id))
+                    .ToList();
+            }
+
+            // Set content type and suggested filename
+            Response.Headers.Add("Content-Disposition", "attachment; filename=\"quiz-questions-export.json\"");
+
+            return Ok(questions);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error exporting questions");
+            return StatusCode(500, "An error occurred while exporting questions");
+        }
+    }
 }
