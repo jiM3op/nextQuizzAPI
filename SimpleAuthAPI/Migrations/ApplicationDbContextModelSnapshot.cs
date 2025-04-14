@@ -48,7 +48,7 @@ namespace SimpleAuthAPI.Migrations
 
                     b.HasIndex("QuestionSimpleId");
 
-                    b.ToTable("Answers");
+                    b.ToTable("Answers", (string)null);
                 });
 
             modelBuilder.Entity("SimpleAuthAPI.Models.Category", b =>
@@ -72,7 +72,7 @@ namespace SimpleAuthAPI.Migrations
                     b.HasIndex("Value")
                         .IsUnique();
 
-                    b.ToTable("Categories");
+                    b.ToTable("Categories", (string)null);
                 });
 
             modelBuilder.Entity("SimpleAuthAPI.Models.QuestionSimple", b =>
@@ -107,7 +107,7 @@ namespace SimpleAuthAPI.Migrations
 
                     b.HasIndex("CreatedById");
 
-                    b.ToTable("Questions");
+                    b.ToTable("Questions", (string)null);
                 });
 
             modelBuilder.Entity("SimpleAuthAPI.Models.Quiz", b =>
@@ -136,7 +136,7 @@ namespace SimpleAuthAPI.Migrations
 
                     b.HasIndex("CreatedById");
 
-                    b.ToTable("Quizzes");
+                    b.ToTable("Quizzes", (string)null);
                 });
 
             modelBuilder.Entity("SimpleAuthAPI.Models.QuizQuestion", b =>
@@ -162,7 +162,7 @@ namespace SimpleAuthAPI.Migrations
 
                     b.HasIndex("QuizId");
 
-                    b.ToTable("QuizQuestions");
+                    b.ToTable("QuizQuestions", (string)null);
                 });
 
             modelBuilder.Entity("SimpleAuthAPI.Models.QuizSession", b =>
@@ -207,7 +207,7 @@ namespace SimpleAuthAPI.Migrations
 
                     b.HasIndex("UserId");
 
-                    b.ToTable("QuizSessions");
+                    b.ToTable("QuizSessions", (string)null);
                 });
 
             modelBuilder.Entity("SimpleAuthAPI.Models.User", b =>
@@ -247,7 +247,7 @@ namespace SimpleAuthAPI.Migrations
 
                     b.HasKey("Id");
 
-                    b.ToTable("Users");
+                    b.ToTable("Users", (string)null);
                 });
 
             modelBuilder.Entity("SimpleAuthAPI.Models.UserAnswer", b =>
@@ -281,7 +281,7 @@ namespace SimpleAuthAPI.Migrations
 
                     b.HasIndex("QuizSessionId");
 
-                    b.ToTable("UserAnswers");
+                    b.ToTable("UserAnswers", (string)null);
                 });
 
             modelBuilder.Entity("SimpleAuthAPI.Models.AnswerSimple", b =>

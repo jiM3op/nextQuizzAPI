@@ -65,62 +65,76 @@ public class QuizSessionController : ControllerBase
 
     // POST: Create a new Quiz Session
     [HttpPost]
-    public async Task<IActionResult> CreateQuizSession([FromBody] QuizSession newSession)
+    public async Task<IActionResult> CreateQuizSession([FromBody] QuizSessionCreateDto dto)
     {
-        if (newSession == null)
+        if (dto == null)
         {
             return BadRequest("Invalid quiz session data");
         }
 
         _logger.LogInformation("📩 Creating new quiz session for quiz ID {QuizId} and user ID {UserId}",
-            newSession.QuizId, newSession.UserId);
+            dto.QuizId, dto.UserId);
 
         // Validate quiz exists
-        var quizExists = await _context.Quizzes.AnyAsync(q => q.Id == newSession.QuizId);
+        var quizExists = await _context.Quizzes.AnyAsync(q => q.Id == dto.QuizId);
         if (!quizExists)
         {
-            return BadRequest($"Quiz with ID {newSession.QuizId} does not exist");
+            return BadRequest($"Quiz with ID {dto.QuizId} does not exist");
         }
 
         // Validate user exists
-        var userExists = await _context.Users.AnyAsync(u => u.Id == newSession.UserId);
+        var userExists = await _context.Users.AnyAsync(u => u.Id == dto.UserId);
         if (!userExists)
         {
-            return BadRequest($"User with ID {newSession.UserId} does not exist");
+            return BadRequest($"User with ID {dto.UserId} does not exist");
         }
 
-        // Set defaults for new session
-        newSession.Id = 0; // Ensure it's a new entity
-        newSession.StartedAt = DateTime.UtcNow;
-        newSession.Status = "in-progress";
-        newSession.CurrentQuestionIndex = 0;
+        // Create new session entity
+        var newSession = new QuizSession
+        {
+            QuizId = dto.QuizId,
+            UserId = dto.UserId,
+            MaxDuration = dto.MaxDuration,
+            StartedAt = DateTime.UtcNow,
+            Status = "in-progress",
+            CurrentQuestionIndex = 0,
+            UserAnswers = new List<UserAnswer>()
+        };
 
-        // If metadata is provided as a complex object, serialize it
-        if (newSession.Metadata != null && !newSession.Metadata.StartsWith("{"))
+        // Process metadata
+        if (dto.Metadata != null && !dto.Metadata.StartsWith("{"))
         {
             // This means it came as an object from the client and needs serializing
             try
             {
-                newSession.Metadata = System.Text.Json.JsonSerializer.Serialize(newSession.Metadata);
+                newSession.Metadata = System.Text.Json.JsonSerializer.Serialize(dto.Metadata);
             }
             catch
             {
                 // If serialization fails, just use it as is - it might already be a string
+                newSession.Metadata = dto.Metadata;
             }
         }
-
-        // Clear any provided answers - they should be added separately
-        newSession.UserAnswers = new List<UserAnswer>();
+        else
+        {
+            newSession.Metadata = dto.Metadata;
+        }
 
         _context.QuizSessions.Add(newSession);
         await _context.SaveChangesAsync();
 
-        return CreatedAtAction(nameof(GetQuizSession), new { id = newSession.Id }, newSession);
+        // Include navigation properties for the response
+        var sessionWithDetails = await _context.QuizSessions
+            .Include(qs => qs.Quiz)
+            .Include(qs => qs.User)
+            .FirstOrDefaultAsync(qs => qs.Id == newSession.Id);
+
+        return CreatedAtAction(nameof(GetQuizSession), new { id = newSession.Id }, sessionWithDetails);
     }
 
     // PATCH: Update an existing Quiz Session
     [HttpPatch("{id}")]
-    public async Task<IActionResult> UpdateQuizSession(int id, [FromBody] QuizSession updatedSession)
+    public async Task<IActionResult> UpdateQuizSession(int id, [FromBody] QuizSessionUpdateDto dto)
     {
         _logger.LogInformation("✏️ Updating quiz session ID {Id}", id);
 
@@ -132,15 +146,30 @@ public class QuizSessionController : ControllerBase
         }
 
         // Update only the fields that should be updatable
-        existingSession.CurrentQuestionIndex = updatedSession.CurrentQuestionIndex;
-        existingSession.Status = updatedSession.Status;
-        existingSession.Score = updatedSession.Score;
-        existingSession.MaxDuration = updatedSession.MaxDuration;
-
-        // If session is being completed, set the completion time
-        if (updatedSession.Status == "completed" && !existingSession.CompletedAt.HasValue)
+        if (dto.CurrentQuestionIndex.HasValue)
         {
-            existingSession.CompletedAt = DateTime.UtcNow;
+            existingSession.CurrentQuestionIndex = dto.CurrentQuestionIndex;
+        }
+
+        if (!string.IsNullOrEmpty(dto.Status))
+        {
+            existingSession.Status = dto.Status;
+
+            // If session is being completed, set the completion time
+            if (dto.Status == "completed" && !existingSession.CompletedAt.HasValue)
+            {
+                existingSession.CompletedAt = DateTime.UtcNow;
+            }
+        }
+
+        if (dto.Score.HasValue)
+        {
+            existingSession.Score = dto.Score;
+        }
+
+        if (dto.MaxDuration.HasValue)
+        {
+            existingSession.MaxDuration = dto.MaxDuration;
         }
 
         await _context.SaveChangesAsync();
