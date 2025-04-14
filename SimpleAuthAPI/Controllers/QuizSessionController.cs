@@ -7,6 +7,7 @@ using System.Threading.Tasks;
 using System.Collections.Generic;
 using SimpleAuthAPI.Models;
 using SimpleAuthAPI.Data;
+using Microsoft.AspNetCore.Authorization;
 
 namespace SimpleAuthAPI.Controllers;
 
@@ -445,6 +446,154 @@ public class QuizSessionController : ControllerBase
         };
 
         return Ok(reviewResponse);
+    }
+
+    [HttpGet("user/{userId}")]
+    [Authorize]
+    public async Task<IActionResult> GetUserQuizSessions(int userId)
+    {
+        _logger.LogInformation("Fetching quiz sessions for user ID: {UserId}", userId);
+
+        // Get the current username instead of trying to parse it as an integer
+        var currentUsername = HttpContext.User.Identity.Name;
+
+        // Fetch the current user to get their ID
+        var currentUser = await _context.Users.FirstOrDefaultAsync(u => u.UserName == currentUsername);
+        if (currentUser == null)
+        {
+            _logger.LogWarning("User not found with username: {Username}", currentUsername);
+            return NotFound("Current user not found");
+        }
+
+        var isAdmin = HttpContext.User.IsInRole("Admin");
+
+        // Check if requesting user has permission (is admin or is the user themselves)
+        if (!isAdmin && currentUser.Id != userId)
+        {
+            _logger.LogWarning("Unauthorized attempt to access user {UserId} quiz sessions by user {CurrentUserId}",
+                userId, currentUser.Id);
+            return Forbid();
+        }
+
+        // Get quiz sessions with related quiz data
+        var quizSessions = await _context.QuizSessions
+            .Include(qs => qs.Quiz)
+            .Where(qs => qs.UserId == userId)
+            .OrderByDescending(qs => qs.CompletedAt)
+            .Select(qs => new QuizActivityDto
+            {
+                Id = qs.Id,
+                QuizId = qs.QuizId,
+                QuizName = qs.Quiz.QuizName,
+                StartedAt = qs.StartedAt.ToString("yyyy-MM-ddTHH:mm:ss"),
+                CompletedAt = qs.CompletedAt.HasValue ? qs.CompletedAt.Value.ToString("yyyy-MM-ddTHH:mm:ss") : null,
+                Score = qs.Score ?? 0,
+                QuestionsTotal = qs.Quiz.Questions.Count,
+                QuestionsAnswered = qs.UserAnswers.Count
+            })
+            .ToListAsync();
+
+        return Ok(quizSessions);
+    }
+
+    [HttpPost("complete/{sessionId}")]
+    [Authorize]
+    public async Task<IActionResult> CompleteQuizSession(int sessionId)
+    {
+        _logger.LogInformation("Completing quiz session with ID: {SessionId}", sessionId);
+
+        try
+        {
+            // Get the session with user answers
+            var session = await _context.QuizSessions
+                .Include(qs => qs.Quiz)
+                .Include(qs => qs.UserAnswers)
+                .FirstOrDefaultAsync(qs => qs.Id == sessionId);
+
+            if (session == null)
+            {
+                _logger.LogWarning("Quiz session not found with ID: {SessionId}", sessionId);
+                return NotFound("Quiz session not found");
+            }
+
+            // Skip if already completed
+            if (session.CompletedAt.HasValue && session.Status == "completed")
+            {
+                _logger.LogInformation("Quiz session {SessionId} already marked as completed", sessionId);
+                return Ok(new
+                {
+                    sessionId = session.Id,
+                    score = session.Score,
+                    status = session.Status
+                });
+            }
+
+            // Mark the session as completed
+            session.CompletedAt = DateTime.UtcNow;
+            session.Status = "completed";
+
+            // Calculate the score
+            double correctAnswers = 0;
+            int totalAnsweredQuestions = session.UserAnswers.Count;
+
+            // Fetch all required question and answer data for score calculation
+            foreach (var userAnswer in session.UserAnswers)
+            {
+                // Fetch the question with its answers
+                var question = await _context.Questions
+                    .Include(q => q.Answers)
+                    .FirstOrDefaultAsync(q => q.Id == userAnswer.QuestionId);
+
+                if (question == null) continue;
+
+                // Get the correct answer IDs for this question
+                var correctAnswerIds = question.Answers
+                    .Where(a => a.AnswerCorrect)
+                    .Select(a => a.Id)
+                    .ToList();
+
+                // Check if the user selected all correct answers and only correct answers
+                bool isCorrect = userAnswer.SelectedAnswerIds.Count == correctAnswerIds.Count &&
+                                  userAnswer.SelectedAnswerIds.All(id => correctAnswerIds.Contains(id));
+
+                if (isCorrect)
+                {
+                    correctAnswers++;
+                    userAnswer.IsCorrect = true;
+                }
+                else
+                {
+                    userAnswer.IsCorrect = false;
+                }
+            }
+
+            // Calculate percentage score (handle division by zero)
+            double scorePercentage = totalAnsweredQuestions > 0
+                ? (correctAnswers / totalAnsweredQuestions) * 100
+                : 0;
+
+            // Round to nearest integer and save
+            session.Score = Math.Round(scorePercentage);
+
+            _logger.LogInformation(
+                "Quiz session {SessionId} completed. Score: {Score}% ({Correct}/{Total})",
+                sessionId, session.Score, correctAnswers, totalAnsweredQuestions);
+
+            await _context.SaveChangesAsync();
+
+            return Ok(new
+            {
+                sessionId = session.Id,
+                score = session.Score,
+                correctAnswers,
+                totalQuestions = totalAnsweredQuestions
+            });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error completing quiz session {SessionId}", sessionId);
+            return StatusCode(500, "An error occurred while completing the quiz session");
+        }
     }
 
 
