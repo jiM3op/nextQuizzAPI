@@ -69,7 +69,7 @@ builder
                 var claims = new List<Claim>
                 {
                     new Claim(ClaimTypes.Name, username),
-                    new Claim("IsInQuizContributers", "False"),
+                    new Claim("IsInQuizContributors", "False"),
                 };
 
                 var identity = new ClaimsIdentity(
@@ -103,7 +103,7 @@ builder.Services.AddAuthorization();
 builder.Services.AddAuthorization(options =>
 {
     options.AddPolicy("ContributorOnly", policy =>
-        policy.RequireClaim("IsInQuizContributers", "True"));
+        policy.RequireClaim("IsInQuizContributors", "True"));
 });
 
 // ✅ Enable CORS for Next.js frontend

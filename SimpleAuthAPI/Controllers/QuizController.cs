@@ -205,7 +205,7 @@ public class QuizController : ControllerBase
             var currentUser = await _context.Users.FirstOrDefaultAsync(u => u.UserName == currentUserName);
 
             bool isAdmin = HttpContext.User.Claims
-                .Any(c => c.Type == "IsInQuizContributers" && c.Value == "True");
+                .Any(c => c.Type == "IsInQuizContributors" && c.Value == "True");
 
             // Only allow the creator or admins to update the quiz
             if (quiz.CreatedById != currentUser?.Id && !isAdmin)
@@ -303,7 +303,7 @@ public class QuizController : ControllerBase
             var currentUser = await _context.Users.FirstOrDefaultAsync(u => u.UserName == currentUserName);
 
             bool isAdmin = HttpContext.User.Claims
-                .Any(c => c.Type == "IsInQuizContributers" && c.Value == "True");
+                .Any(c => c.Type == "IsInQuizContributors" && c.Value == "True");
 
             // Only allow the creator or admins to modify the quiz
             if (quiz.CreatedById != currentUser?.Id && !isAdmin)
@@ -379,7 +379,7 @@ public class QuizController : ControllerBase
             var currentUser = await _context.Users.FirstOrDefaultAsync(u => u.UserName == currentUserName);
 
             bool isAdmin = HttpContext.User.Claims
-                .Any(c => c.Type == "IsInQuizContributers" && c.Value == "True");
+                .Any(c => c.Type == "IsInQuizContributors" && c.Value == "True");
 
             // Only allow the creator or admins to modify the quiz
             if (quiz.CreatedById != currentUser?.Id && !isAdmin)
@@ -435,7 +435,7 @@ public class QuizController : ControllerBase
             var currentUser = await _context.Users.FirstOrDefaultAsync(u => u.UserName == currentUserName);
 
             bool isAdmin = HttpContext.User.Claims
-                .Any(c => c.Type == "IsInQuizContributers" && c.Value == "True");
+                .Any(c => c.Type == "IsInQuizContributors" && c.Value == "True");
 
             // Only allow the creator or admins to delete the quiz
             if (quiz.CreatedById != currentUser?.Id && !isAdmin)
@@ -474,7 +474,7 @@ public class QuizController : ControllerBase
             var currentUser = await _context.Users.FirstOrDefaultAsync(u => u.UserName == currentUserName);
 
             bool isAdmin = HttpContext.User.Claims
-                .Any(c => c.Type == "IsInQuizContributers" && c.Value == "True");
+                .Any(c => c.Type == "IsInQuizContributors" && c.Value == "True");
 
             // Only allow users to see their own quizzes or admins to see any user's quizzes
             if (currentUser?.Id != userId && !isAdmin)

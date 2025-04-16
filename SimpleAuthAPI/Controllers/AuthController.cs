@@ -76,7 +76,7 @@ public class AuthController : ControllerBase
         var claims = new List<Claim>
     {
         new Claim(ClaimTypes.Name, user.Name),
-        new Claim("IsInQuizContributers", isInQuizContributors.ToString()), // Set dynamically
+        new Claim("IsInQuizContributors", isInQuizContributors.ToString()), // Set dynamically
         new Claim(ClaimTypes.GivenName, firstName),
         new Claim(ClaimTypes.Surname, lastName),
         new Claim("DisplayName", displayName),
@@ -108,7 +108,7 @@ public class AuthController : ControllerBase
         return Ok(new
         {
             User = user.Name,
-            IsInQuizContributers = isInQuizContributors,
+            IsInQuizContributors = isInQuizContributors,
             FirstName = firstName,
             LastName = lastName,
             DisplayName = displayName,
@@ -134,11 +134,11 @@ public class AuthController : ControllerBase
         }
 
         bool isInGroup =
-            HttpContext.User.Claims.FirstOrDefault(c => c.Type == "IsInQuizContributers")?.Value
+            HttpContext.User.Claims.FirstOrDefault(c => c.Type == "IsInQuizContributors")?.Value
             == "True";
 
         Log.Information("👤 User {User} accessed /api/user. Group: {Group}", user.Name, isInGroup);
-        return Ok(new { User = user.Name, IsInQuizContributers = isInGroup });
+        return Ok(new { User = user.Name, IsInQuizContributors = isInGroup });
     }
 
     [HttpPost("logout")]

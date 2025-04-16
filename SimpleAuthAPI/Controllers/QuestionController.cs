@@ -228,7 +228,7 @@ public class QuestionController : ControllerBase
         var currentUser = await _context.Users.FirstOrDefaultAsync(u => u.UserName == currentUserName);
 
         bool isAdmin = HttpContext.User.Claims
-            .Any(c => c.Type == "IsInQuizContributers" && c.Value == "True");
+            .Any(c => c.Type == "IsInQuizContributors" && c.Value == "True");
 
         // Only allow the creator or admins to update the question
         if (existingQuestion.CreatedById != currentUser?.Id && !isAdmin)
@@ -326,7 +326,7 @@ public class QuestionController : ControllerBase
         var currentUser = await _context.Users.FirstOrDefaultAsync(u => u.UserName == currentUserName);
 
         bool isAdmin = HttpContext.User.Claims
-            .Any(c => c.Type == "IsInQuizContributers" && c.Value == "True");
+            .Any(c => c.Type == "IsInQuizContributors" && c.Value == "True");
 
         // Only allow users to see their own questions or admins to see any user's questions
         if (currentUser?.Id != userId && !isAdmin)
